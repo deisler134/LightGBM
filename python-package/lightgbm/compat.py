@@ -1,6 +1,6 @@
 # coding: utf-8
 # pylint: disable = C0103
-"""Compatibility"""
+"""Compatibility library."""
 from __future__ import absolute_import
 
 import inspect
@@ -10,30 +10,34 @@ import numpy as np
 
 is_py3 = (sys.version_info[0] == 3)
 
-"""compatibility between python2 and python3"""
+"""Compatibility between Python2 and Python3"""
 if is_py3:
+    zip_ = zip
     string_type = str
     numeric_types = (int, float, bool)
     integer_types = (int, )
     range_ = range
 
     def argc_(func):
-        """return number of arguments of a function"""
+        """Count the number of arguments of a function."""
         return len(inspect.signature(func).parameters)
 
     def decode_string(bytestring):
+        """Decode C bytestring to ordinary string."""
         return bytestring.decode('utf-8')
 else:
+    from itertools import izip as zip_
     string_type = basestring
     numeric_types = (int, long, float, bool)
     integer_types = (int, long)
     range_ = xrange
 
     def argc_(func):
-        """return number of arguments of a function"""
+        """Count the number of arguments of a function."""
         return len(inspect.getargspec(func).args)
 
     def decode_string(bytestring):
+        """Decode C bytestring to ordinary string."""
         return bytestring
 
 """json"""
@@ -46,6 +50,7 @@ except (ImportError, SyntaxError):
 
 
 def json_default_with_numpy(obj):
+    """Convert numpy classes to JSON serializable objects."""
     if isinstance(obj, (np.integer, np.floating, np.bool_)):
         return obj.item()
     elif isinstance(obj, np.ndarray):
@@ -57,12 +62,33 @@ def json_default_with_numpy(obj):
 """pandas"""
 try:
     from pandas import Series, DataFrame
+    PANDAS_INSTALLED = True
 except ImportError:
+    PANDAS_INSTALLED = False
+
     class Series(object):
+        """Dummy class for pandas.Series."""
+
         pass
 
     class DataFrame(object):
+        """Dummy class for pandas.DataFrame."""
+
         pass
+
+"""matplotlib"""
+try:
+    import matplotlib
+    MATPLOTLIB_INSTALLED = True
+except ImportError:
+    MATPLOTLIB_INSTALLED = False
+
+"""graphviz"""
+try:
+    import graphviz
+    GRAPHVIZ_INSTALLED = True
+except ImportError:
+    GRAPHVIZ_INSTALLED = False
 
 """sklearn"""
 try:
@@ -71,7 +97,8 @@ try:
     from sklearn.preprocessing import LabelEncoder
     from sklearn.utils.class_weight import compute_sample_weight
     from sklearn.utils.multiclass import check_classification_targets
-    from sklearn.utils.validation import check_X_y, check_array, check_consistent_length
+    from sklearn.utils.validation import (assert_all_finite, check_X_y,
+                                          check_array, check_consistent_length)
     try:
         from sklearn.model_selection import StratifiedKFold, GroupKFold
         from sklearn.exceptions import NotFittedError
@@ -89,6 +116,7 @@ try:
     _LGBMCheckXY = check_X_y
     _LGBMCheckArray = check_array
     _LGBMCheckConsistentLength = check_consistent_length
+    _LGBMAssertAllFinite = assert_all_finite
     _LGBMCheckClassificationTargets = check_classification_targets
     _LGBMComputeSampleWeight = compute_sample_weight
 except ImportError:
@@ -103,10 +131,13 @@ except ImportError:
     _LGBMCheckXY = None
     _LGBMCheckArray = None
     _LGBMCheckConsistentLength = None
+    _LGBMAssertAllFinite = None
     _LGBMCheckClassificationTargets = None
     _LGBMComputeSampleWeight = None
 
 
 # DeprecationWarning is not shown by default, so let's create our own with higher level
 class LGBMDeprecationWarning(UserWarning):
+    """Custom deprecation warning."""
+
     pass

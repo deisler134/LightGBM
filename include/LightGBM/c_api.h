@@ -1,13 +1,8 @@
 #ifndef LIGHTGBM_C_API_H_
 #define LIGHTGBM_C_API_H_
 
-#include <LightGBM/meta.h>
-
 #include <cstdint>
-#include <exception>
-#include <stdexcept>
 #include <cstring>
-#include <string>
 
 /*!
 * To avoid type conversion on large data, most of our expose interface support both for float_32 and float_64.
@@ -205,6 +200,27 @@ LIGHTGBM_C_EXPORT int LGBM_DatasetCreateFromMat(const void* data,
                                                 DatasetHandle* out);
 
 /*!
+* \brief create dataset from array of dense matrices
+* \param data pointer to the data space
+* \param data_type type of data pointer, can be C_API_DTYPE_FLOAT32 or C_API_DTYPE_FLOAT64
+* \param nrow number of rows
+* \param ncol number columns
+* \param parameters additional parameters
+* \param reference used to align bin mapper with other dataset, nullptr means don't used
+* \param out created dataset
+* \return 0 when succeed, -1 when failure happens
+*/
+LIGHTGBM_C_EXPORT int LGBM_DatasetCreateFromMats(int32_t nmat,
+                                                 const void** data,
+                                                 int data_type,
+                                                 int32_t* nrow,
+                                                 int32_t ncol,
+                                                 int is_row_major,
+                                                 const char* parameters,
+                                                 const DatasetHandle reference,
+                                                 DatasetHandle* out);
+
+/*!
 * \brief Create subset of a data
 * \param handle handle of full dataset
 * \param used_row_indices Indices used in subset
@@ -356,6 +372,11 @@ LIGHTGBM_C_EXPORT int LGBM_BoosterLoadModelFromString(
 LIGHTGBM_C_EXPORT int LGBM_BoosterFree(BoosterHandle handle);
 
 /*!
+* \brief Shuffle Models
+*/
+LIGHTGBM_C_EXPORT int LGBM_BoosterShuffleModels(BoosterHandle handle, int start_iter, int end_iter);
+
+/*!
 * \brief Merge model in two booster to first handle
 * \param handle handle, will merge other handle to this
 * \param other_handle
@@ -407,6 +428,16 @@ LIGHTGBM_C_EXPORT int LGBM_BoosterGetNumClasses(BoosterHandle handle, int* out_l
 LIGHTGBM_C_EXPORT int LGBM_BoosterUpdateOneIter(BoosterHandle handle, int* is_finished);
 
 /*!
+* \brief Refit the tree model using the new data (online learning)
+* \param handle handle
+* \param leaf_preds 
+* \param nrow number of rows of leaf_preds
+* \param ncol number of columns of leaf_preds
+* \return 0 when succeed, -1 when failure happens
+*/
+LIGHTGBM_C_EXPORT int LGBM_BoosterRefit(BoosterHandle handle, const int32_t* leaf_preds, int32_t nrow, int32_t ncol);
+
+/*!
 * \brief update the model, by directly specify gradient and second order gradient,
 *       this can be used to support customized loss function
 * \param handle handle
@@ -433,6 +464,20 @@ LIGHTGBM_C_EXPORT int LGBM_BoosterRollbackOneIter(BoosterHandle handle);
 * \return 0 when succeed, -1 when failure happens
 */
 LIGHTGBM_C_EXPORT int LGBM_BoosterGetCurrentIteration(BoosterHandle handle, int* out_iteration);
+
+/*!
+* \brief Get number of tree per iteration
+* \param out_tree_per_iteration number of tree per iteration
+* \return 0 when succeed, -1 when failure happens
+*/
+LIGHTGBM_C_EXPORT int LGBM_BoosterNumModelPerIteration(BoosterHandle handle, int* out_tree_per_iteration);
+
+/*!
+* \brief Get number of weak sub-models
+* \param out_models number of weak sub-models
+* \return 0 when succeed, -1 when failure happens
+*/
+LIGHTGBM_C_EXPORT int LGBM_BoosterNumberOfTotalModel(BoosterHandle handle, int* out_models);
 
 /*!
 * \brief Get number of eval
@@ -666,6 +711,7 @@ LIGHTGBM_C_EXPORT int LGBM_BoosterPredictForMat(BoosterHandle handle,
 * \return 0 when succeed, -1 when failure happens
 */
 LIGHTGBM_C_EXPORT int LGBM_BoosterSaveModel(BoosterHandle handle,
+                                            int start_iteration,
                                             int num_iteration,
                                             const char* filename);
 
@@ -679,6 +725,7 @@ LIGHTGBM_C_EXPORT int LGBM_BoosterSaveModel(BoosterHandle handle,
 * \return 0 when succeed, -1 when failure happens
 */
 LIGHTGBM_C_EXPORT int LGBM_BoosterSaveModelToString(BoosterHandle handle,
+                                                    int start_iteration,
                                                     int num_iteration,
                                                     int64_t buffer_len,
                                                     int64_t* out_len,
@@ -694,6 +741,7 @@ LIGHTGBM_C_EXPORT int LGBM_BoosterSaveModelToString(BoosterHandle handle,
 * \return 0 when succeed, -1 when failure happens
 */
 LIGHTGBM_C_EXPORT int LGBM_BoosterDumpModel(BoosterHandle handle,
+                                            int start_iteration,
                                             int num_iteration,
                                             int64_t buffer_len,
                                             int64_t* out_len,
@@ -761,6 +809,12 @@ LIGHTGBM_C_EXPORT int LGBM_NetworkInitWithFunctions(int num_machines, int rank,
                                                     void* reduce_scatter_ext_fun, 
                                                     void* allgather_ext_fun);
 
+
+#if defined(_MSC_VER)
+#define THREAD_LOCAL __declspec(thread) 
+#else
+#define THREAD_LOCAL thread_local
+#endif
 // exception handle and error msg
 static char* LastErrorMsg() { static THREAD_LOCAL char err_msg[512] = "Everything is fine"; return err_msg; }
 
@@ -768,22 +822,5 @@ static char* LastErrorMsg() { static THREAD_LOCAL char err_msg[512] = "Everythin
 inline void LGBM_SetLastError(const char* msg) {
   std::strcpy(LastErrorMsg(), msg);
 }
-
-inline int LGBM_APIHandleException(const std::exception& ex) {
-  LGBM_SetLastError(ex.what());
-  return -1;
-}
-inline int LGBM_APIHandleException(const std::string& ex) {
-  LGBM_SetLastError(ex.c_str());
-  return -1;
-}
-
-#define API_BEGIN() try {
-
-#define API_END() } \
-catch(std::exception& ex) { return LGBM_APIHandleException(ex); } \
-catch(std::string& ex) { return LGBM_APIHandleException(ex); } \
-catch(...) { return LGBM_APIHandleException("unknown exception"); } \
-return 0;
 
 #endif // LIGHTGBM_C_API_H_

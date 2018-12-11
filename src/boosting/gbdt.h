@@ -70,6 +70,33 @@ public:
     num_iteration_for_pred_ = static_cast<int>(models_.size()) / num_tree_per_iteration_;
   }
 
+  void ShuffleModels(int start_iter, int end_iter) override {
+    int total_iter = static_cast<int>(models_.size()) / num_tree_per_iteration_;
+    start_iter = std::max(0, start_iter);
+    if (end_iter <= 0) {
+      end_iter = total_iter;
+    }
+    end_iter = std::min(total_iter, end_iter);
+    auto original_models = std::move(models_);
+    std::vector<int> indices(total_iter);
+    for (int i = 0; i < total_iter; ++i) {
+      indices[i] = i;
+    }
+    Random tmp_rand(17);
+    for (int i = start_iter; i < end_iter - 1; ++i) {
+      int j = tmp_rand.NextShort(i + 1, end_iter);
+      std::swap(indices[i], indices[j]);
+    }
+    models_ = std::vector<std::unique_ptr<Tree>>();
+    for (int i = 0; i < total_iter; ++i) {
+      for (int j = 0; j < num_tree_per_iteration_; ++j) {
+        int tree_idx = indices[i] * num_tree_per_iteration_ + j;
+        auto new_tree = std::unique_ptr<Tree>(new Tree(*(original_models[tree_idx].get())));
+        models_.push_back(std::move(new_tree));
+      }
+    }
+  }
+
   /*!
   * \brief Reset the training data
   * \param train_data New Training data
@@ -211,10 +238,11 @@ public:
 
   /*!
   * \brief Dump model to json format string
+  * \param start_iteration The model will be saved start from
   * \param num_iteration Number of iterations that want to dump, -1 means dump all
   * \return Json format string of model
   */
-  std::string DumpModel(int num_iteration) const override;
+  std::string DumpModel(int start_iteration, int num_iteration) const override;
 
   /*!
   * \brief Translate model to if-else statement
@@ -233,18 +261,20 @@ public:
 
   /*!
   * \brief Save model to file
+  * \param start_iteration The model will be saved start from
   * \param num_iterations Number of model that want to save, -1 means save all
   * \param filename Filename that want to save to
   * \return is_finish Is training finished or not
   */
-  virtual bool SaveModelToFile(int num_iterations, const char* filename) const override;
+  virtual bool SaveModelToFile(int start_iteration, int num_iterations, const char* filename) const override;
 
   /*!
   * \brief Save model to string
+  * \param start_iteration The model will be saved start from
   * \param num_iterations Number of model that want to save, -1 means save all
   * \return Non-empty string if succeeded
   */
-  virtual std::string SaveModelToString(int num_iterations) const override;
+  virtual std::string SaveModelToString(int start_iteration, int num_iterations) const override;
 
   /*!
   * \brief Restore from a serialized buffer
@@ -330,7 +360,7 @@ protected:
   /*!
   * \brief Print eval result and check early stopping
   */
-  bool EvalAndCheckEarlyStopping();
+  virtual bool EvalAndCheckEarlyStopping();
 
   /*!
   * \brief reset config for bagging
@@ -377,7 +407,7 @@ protected:
   */
   std::string OutputMetric(int iter);
 
-  double BoostFromAverage();
+  double BoostFromAverage(int class_id);
 
   /*! \brief current iteration */
   int iter_;
@@ -451,13 +481,14 @@ protected:
   std::unique_ptr<Dataset> tmp_subset_;
   bool is_use_subset_;
   std::vector<bool> class_need_train_;
-  std::vector<double> class_default_output_;
   bool is_constant_hessian_;
   std::unique_ptr<ObjectiveFunction> loaded_objective_;
   bool average_output_;
   bool need_re_bagging_;
+  std::string loaded_parameter_;
 
   Json forced_splits_json_;
+
 };
 
 }  // namespace LightGBM

@@ -51,6 +51,11 @@ public:
     weights_ = metadata.weights();
     data_size_t cnt_positive = 0;
     data_size_t cnt_negative = 0;
+    // REMOVEME: remove the warning after 2.4 version release
+    Log::Warning("Starting from the 2.1.2 version, default value for "
+                 "the \"boost_from_average\" parameter in \"binary\" objective is true.\n"
+                 "This may cause significantly different results comparing to the previous versions of LightGBM.\n" 
+                 "Try to set boost_from_average=false, if your old models produce bad results");
     // count for positive and negative samples
     #pragma omp parallel for schedule(static) reduction(+:cnt_positive, cnt_negative)
     for (data_size_t i = 0; i < num_data_; ++i) {
@@ -60,10 +65,11 @@ public:
         ++cnt_negative;
       }
     }
+    need_train_ = true;
     if (cnt_negative == 0 || cnt_positive == 0) {
       Log::Warning("Contains only one class");
       // not need to boost.
-      num_data_ = 0;
+      need_train_ = false;
     }
     Log::Info("Number of positive: %d, number of negative: %d", cnt_positive, cnt_negative);
     // use -1 for negative class, and 1 for positive class
@@ -86,6 +92,9 @@ public:
   }
 
   void GetGradients(const double* score, score_t* gradients, score_t* hessians) const override {
+    if (!need_train_) {
+      return;
+    }
     if (weights_ == nullptr) {
       #pragma omp parallel for schedule(static)
       for (data_size_t i = 0; i < num_data_; ++i) {
@@ -116,26 +125,32 @@ public:
   }
   
   // implement custom average to boost from (if enabled among options)
-  double BoostFromScore() const override {
+  double BoostFromScore(int) const override {
     double suml = 0.0f;
     double sumw = 0.0f;
     if (weights_ != nullptr) {
       #pragma omp parallel for schedule(static) reduction(+:suml,sumw)
       for (data_size_t i = 0; i < num_data_; ++i) {
-        suml += label_[i] * weights_[i];
+        suml += is_pos_(label_[i]) * weights_[i];
         sumw += weights_[i];
       }
     } else {
       sumw = static_cast<double>(num_data_);
       #pragma omp parallel for schedule(static) reduction(+:suml)
       for (data_size_t i = 0; i < num_data_; ++i) {
-        suml += label_[i];
+        suml += is_pos_(label_[i]);
       }
     }
     double pavg = suml / sumw;
+    pavg = std::min(pavg, 1.0 - kEpsilon);
+    pavg = std::max<double>(pavg, kEpsilon);
     double initscore = std::log(pavg / (1.0f - pavg)) / sigmoid_;
     Log::Info("[%s:%s]: pavg=%f -> initscore=%f",  GetName(), __func__, pavg, initscore);
     return initscore;
+  }
+
+  bool ClassNeedTrain(int /*class_id*/) const override { 
+    return need_train_;
   }
 
   const char* GetName() const override {
@@ -174,6 +189,7 @@ private:
   const label_t* weights_;
   double scale_pos_weight_;
   std::function<bool(label_t)> is_pos_;
+  bool need_train_;
 };
 
 }  // namespace LightGBM

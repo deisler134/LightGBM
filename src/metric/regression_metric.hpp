@@ -1,9 +1,9 @@
 #ifndef LIGHTGBM_METRIC_REGRESSION_METRIC_HPP_
 #define LIGHTGBM_METRIC_REGRESSION_METRIC_HPP_
 
-#include <LightGBM/utils/log.h>
-
 #include <LightGBM/metric.h>
+
+#include <LightGBM/utils/log.h>
 
 #include <cmath>
 
@@ -252,7 +252,7 @@ public:
     const double theta = -1.0 / score;
     const double a = psi;
     const double b = -std::log(-theta);
-    const double c = 1. / psi * std::log(label / psi) - std::log(label) - std::lgamma(1.0 / psi);
+    const double c = 1. / psi * std::log(label / psi) - std::log(label) - 0; // 0 = std::lgamma(1.0 / psi) = std::lgamma(1.0);
     return -((label * theta - b) / a + c);
   }
   inline static const char* Name() {
@@ -286,6 +286,10 @@ public:
 
   inline static double LossOnPoint(label_t label, double score, const Config& config) {
     const double rho = config.tweedie_variance_power;
+    const double eps = 1e-10f;
+    if (score < eps) {
+      score = eps;
+    }
     const double a = label * std::exp((1 - rho) * std::log(score)) / (1 - rho);
     const double b = std::exp((2 - rho) * std::log(score)) / (2 - rho);
     return -a + b;

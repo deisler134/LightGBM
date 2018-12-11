@@ -29,13 +29,16 @@ Examples include:
     - Create data for learning with sklearn interface 
     - Basic train and predict with sklearn interface
     - Feature importances with sklearn interface
+    - Self-defined eval metric with sklearn interface
     - Find best parameters for the model with sklearn's GridSearchCV
 - [advanced_example.py](https://github.com/Microsoft/LightGBM/blob/master/examples/python-guide/advanced_example.py)
+    - Construct Dataset
     - Set feature names
     - Directly use categorical features without one-hot encoding
-    - Dump model to json format
-    - Get feature importances
+    - Save model to file
+    - Dump model to JSON format
     - Get feature names
+    - Get feature importances
     - Load model to predict
     - Dump and load model with pickle
     - Load model file to continue training

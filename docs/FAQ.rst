@@ -1,8 +1,7 @@
 LightGBM FAQ
 ============
 
-Contents
-~~~~~~~~
+**Contents**
 
 -  `Critical <#critical>`__
 
@@ -19,15 +18,16 @@ Critical
 
 Please post an issue in `Microsoft/LightGBM repository <https://github.com/Microsoft/LightGBM/issues>`__ for any
 LightGBM issues you encounter. For critical issues (crash, prediction error, nonsense outputs...), you may also ping a
-member of the core team according the relevant area of expertise by mentioning them with the arobase (@) symbol:
+member of the core team according to the relevant area of expertise by mentioning them with the arobase (@) symbol:
 
--  `@guolinke <https://github.com/guolinke>`__ (C++ code / R-package / Python-package)
--  `@chivee <https://github.com/chivee>`__ (C++ code / Python-package)
--  `@Laurae2 <https://github.com/Laurae2>`__ (R-package)
--  `@wxchan <https://github.com/wxchan>`__ (Python-package)
--  `@henry0312 <https://github.com/henry0312>`__ (Python-package)
--  `@StrikerRUS <https://github.com/StrikerRUS>`__ (Python-package)
--  `@huanzhang12 <https://github.com/huanzhang12>`__ (GPU support)
+-  `@guolinke <https://github.com/guolinke>`__ **Guolin Ke** (C++ code / R-package / Python-package)
+-  `@chivee <https://github.com/chivee>`__ **Qiwei Ye** (C++ code / Python-package)
+-  `@Laurae2 <https://github.com/Laurae2>`__ **Damien Soukhavong** (R-package)
+-  `@jameslamb <https://github.com/jameslamb>`__ **James Lamb** (R-package)
+-  `@wxchan <https://github.com/wxchan>`__ **Wenxuan Chen** (Python-package)
+-  `@henry0312 <https://github.com/henry0312>`__ **Tsukasa Omoto** (Python-package)
+-  `@StrikerRUS <https://github.com/StrikerRUS>`__ **Nikita Titov** (Python-package)
+-  `@huanzhang12 <https://github.com/huanzhang12>`__ **Huan Zhang** (GPU support)
 
 Please include as much of the following information as possible when submitting a critical issue:
 
@@ -35,9 +35,9 @@ Please include as much of the following information as possible when submitting 
 
 -  Is it specific to a wrapper? (R or Python?)
 
--  Is it specific to the compiler? (gcc versions? MinGW versions?)
+-  Is it specific to the compiler? (gcc or Clang version? MinGW or Visual Studio version?)
 
--  Is it specific to your Operating System? (Windows? Linux?)
+-  Is it specific to your Operating System? (Windows? Linux? macOS?)
 
 -  Are you able to reproduce this issue with a simple case?
 
@@ -56,7 +56,7 @@ LightGBM
 
 --------------
 
--  **Question 2**: On datasets with million of features, training does not start (or starts after a very long time).
+-  **Question 2**: On datasets with millions of features, training does not start (or starts after a very long time).
 
 -  **Solution 2**: Use a smaller value for ``bin_construct_sample_cnt`` and a larger value for ``min_data``.
 
@@ -98,17 +98,58 @@ LightGBM
 
 --------------
 
--  **Question 8**: CPU usage is low (like 10%) in Windows when using LightGBM on very large datasets with many core systems.
+-  **Question 8**: CPU usage is low (like 10%) in Windows when using LightGBM on very large datasets with many-core systems.
 
--  **Solution 8**: Please use `Visual Studio <https://www.visualstudio.com/downloads/>`__
+-  **Solution 8**: Please use `Visual Studio <https://visualstudio.microsoft.com/downloads/>`__
    as it may be `10x faster than MinGW <https://github.com/Microsoft/LightGBM/issues/749>`__ especially for very large trees.
 
 --------------
 
--  **Question 9**: When I'm trying to specify a categorical column with the ``categorical_feature`` parameter, I get a segmentation fault.
+-  **Question 9**: When I'm trying to specify a categorical column with the ``categorical_feature`` parameter,
+   I get the following sequence of warnings, but there are no negative values in the column.
+
+   ::
+
+       [LightGBM] [Warning] Met negative value in categorical features, will convert it to NaN
+       [LightGBM] [Warning] There are no meaningful features, as all feature values are constant.
 
 -  **Solution 9**: The column you're trying to pass via ``categorical_feature`` likely contains very large values.
-   Categorical features in LightGBM are limited by int32 range, so you cannot pass values that are greater than ``Int32.MaxValue`` (2147483647) as categorical features (see `Microsoft/LightGBM#1359 <https://github.com/Microsoft/LightGBM/issues/1359>`__). You should convert them to integers ranging from zero to the number of categories first.
+   Categorical features in LightGBM are limited by int32 range,
+   so you cannot pass values that are greater than ``Int32.MaxValue`` (2147483647) as categorical features (see `Microsoft/LightGBM#1359 <https://github.com/Microsoft/LightGBM/issues/1359>`__).
+   You should convert them to integers ranging from zero to the number of categories first.
+
+--------------
+
+-  **Question 10**: LightGBM crashes randomly with the error like this.
+
+   ::
+
+       OMP: Error #15: Initializing libiomp5.dylib, but found libomp.dylib already initialized.
+       OMP: Hint: This means that multiple copies of the OpenMP runtime have been linked into the program. That is dangerous, since it can degrade performance or cause incorrect results. The best thing to do is to ensure that only a single OpenMP runtime is linked into the process, e.g. by avoiding static linking of the OpenMP runtime in any library. As an unsafe, unsupported, undocumented workaround you can set the environment variable KMP_DUPLICATE_LIB_OK=TRUE to allow the program to continue to execute, but that may cause crashes or silently produce incorrect results. For more information, please see http://www.intel.com/software/products/support/.
+
+-  **Solution 10**: File extensions in the error message may differ depending on the operating system.
+   This error means that you have multiple OpenMP libraries installed on your machine and they conflict with each other.
+
+   If you are using Python distributed by Conda, then it is highly likely that the error is caused by the ``numpy`` package from Conda which includes the ``mkl`` package which in turn conflicts with the system-wide library.
+   In this case you can update the ``numpy`` package in Conda or replace the Conda's OpenMP library instance with system-wide one by creating a symlink to it in Conda environment folder ``$CONDA_PREFIX/lib``.
+
+   Assuming you are using macOS with Homebrew, the command which overwrites OpenMP library files in the current active Conda environment with symlinks to the system-wide library ones installed by Homebrew:
+
+   ::
+
+       ln -sf `ls -d "$(brew --cellar libomp)"/*/lib`/* $CONDA_PREFIX/lib
+
+   If this is not your case, then you should find conflicting OpenMP library installations on your own and leave only one of them.
+
+--------------
+
+-  **Question 11**: LightGBM hangs when multithreading (OpenMP) and using forking in Linux at the same time.
+
+-  **Solution 11**: Use ``nthreads=1`` to disable multithreading of LightGBM. There is a bug with OpenMP which hangs forked sessions with multithreading activated. A more expensive solution is to use new processes instead of using fork, however, keep in mind it is creating new processes where you have to copy memory and load libraries (example: if you want to fork 16 times your current process, then you will require to make 16 copies of your dataset in memory) (see `Microsoft/LightGBM#1789 <https://github.com/Microsoft/LightGBM/issues/1789#issuecomment-433713383>`__).
+   
+   An alternative, if multithreading is really necessary inside the forked sessions, would be to compile LightGBM with Intel toolchain. Intel compilers are unaffected by this bug.
+   
+   For C/C++ users, any OpenMP feature cannot be used before the fork happens. If an OpenMP feature is used before the fork happens (ex: using OpenMP for forking), OpenMP will hang inside the forked sessions. Use new processes instead and copy memory as required by creating new processes instead of forking (or, use Intel compilers).
 
 --------------
 
@@ -179,3 +220,15 @@ Python-package
 
    -  set predictor (or reference/categorical feature) after constructing a dataset,
       you should set ``free_raw_data=False`` or init a Dataset object with the same raw data
+
+--------------
+
+-  **Question 3**: I encounter segmentation faults (segfaults) randomly after installing LightGBM from PyPI using ``pip install lightgbm``.
+
+-  **Solution 3**: We are doing our best to provide universal wheels which have high running speed and are compatible with any hardware, OS, compiler, etc. at the same time.
+   However, sometimes it's just impossible to guarantee the possibility of usage of LightGBM in any specific environment (see `Microsoft/LightGBM#1743 <https://github.com/Microsoft/LightGBM/issues/1743>`__).
+
+   Therefore, the first thing you should try in case of segfaults is **compiling from the source** using ``pip install --no-binary :all: lightgbm``.
+   For the OS-specific prerequisites see `this guide <https://github.com/Microsoft/LightGBM/blob/master/python-package/README.rst#build-from-sources>`__.
+
+   Also, feel free to post a new issue in our GitHub repository. We always look at each case individually and try to find a root cause.

@@ -9,6 +9,7 @@
 #include <thread>
 #include <memory>
 #include <algorithm>
+#include <vector>
 #include "file_io.h"
 
 namespace LightGBM{
@@ -46,7 +47,7 @@ public:
     while (read_cnt > 0) {
       // start read thread
       std::thread read_worker = std::thread(
-        [&reader, &buffer_read, buffer_size, &last_read_cnt] {
+        [&] {
         last_read_cnt = reader->Read(buffer_read.data(), buffer_size);
       }
       );

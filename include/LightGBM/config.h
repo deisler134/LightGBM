@@ -93,7 +93,7 @@ public:
   // desc = ``predict``, for prediction, aliases: ``prediction``, ``test``
   // desc = ``convert_model``, for converting model file into if-else format, see more information in `IO Parameters <#io-parameters>`__
   // desc = ``refit``, for refitting existing models with new data, aliases: ``refit_tree``
-  // desc = **Note**: can be used only in CLI version
+  // desc = **Note**: can be used only in CLI version; for language-specific packages you can use the correspondent functions
   TaskType task = TaskType::kTrain;
 
   // [doc-only]
@@ -110,7 +110,7 @@ public:
   // descl2 = ``mape``, `MAPE loss <https://en.wikipedia.org/wiki/Mean_absolute_percentage_error>`__, aliases: ``mean_absolute_percentage_error``
   // descl2 = ``gamma``, Gamma regression with log-link. It might be useful, e.g., for modeling insurance claims severity, or for any target that might be `gamma-distributed <https://en.wikipedia.org/wiki/Gamma_distribution#Applications>`__
   // descl2 = ``tweedie``, Tweedie regression with log-link. It might be useful, e.g., for modeling total loss in insurance, or for any target that might be `tweedie-distributed <https://en.wikipedia.org/wiki/Tweedie_distribution#Applications>`__
-  // desc = ``binary``, binary `log loss <https://en.wikipedia.org/wiki/Cross_entropy>`__ classification (or logistic regression). Requires labels in {0, 1}; see ``xentropy`` for general probability labels in [0, 1]
+  // desc = ``binary``, binary `log loss <https://en.wikipedia.org/wiki/Cross_entropy>`__ classification (or logistic regression). Requires labels in {0, 1}; see ``cross-entropy`` application for general probability labels in [0, 1]
   // desc = multi-class classification application
   // descl2 = ``multiclass``, `softmax <https://en.wikipedia.org/wiki/Softmax_function>`__ objective function, aliases: ``softmax``
   // descl2 = ``multiclassova``, `One-vs-All <https://en.wikipedia.org/wiki/Multiclass_classification#One-vs.-rest>`__ binary objective function, aliases: ``multiclass_ova``, ``ova``, ``ovr``
@@ -135,31 +135,32 @@ public:
   // desc = ``goss``, Gradient-based One-Side Sampling
   std::string boosting = "gbdt";
 
-  // alias = train, train_data, data_filename
+  // alias = train, train_data, train_data_file, data_filename
   // desc = path of training data, LightGBM will train from this data
+  // desc = **Note**: can be used only in CLI version
   std::string data = "";
 
-  // alias = test, valid_data, valid_data_file, test_data, valid_filenames
+  // alias = test, valid_data, valid_data_file, test_data, test_data_file, valid_filenames
   // default = ""
   // desc = path(s) of validation/test data, LightGBM will output metrics for these data
   // desc = support multiple validation data, separated by ``,``
+  // desc = **Note**: can be used only in CLI version
   std::vector<std::string> valid;
 
-  // alias = num_iteration, num_tree, num_trees, num_round, num_rounds, num_boost_round, n_estimators
+  // alias = num_iteration, n_iter, num_tree, num_trees, num_round, num_rounds, num_boost_round, n_estimators
   // check = >=0
   // desc = number of boosting iterations
-  // desc = **Note**: for Python/R-package, **this parameter is ignored**, use ``num_boost_round`` (Python) or ``nrounds`` (R) input arguments of ``train`` and ``cv`` methods instead
   // desc = **Note**: internally, LightGBM constructs ``num_class * num_iterations`` trees for multi-class classification problems
   int num_iterations = 100;
 
-  // alias = shrinkage_rate
+  // alias = shrinkage_rate, eta
   // check = >0.0
   // desc = shrinkage rate
   // desc = in ``dart``, it also affects on normalization weights of dropped trees
   double learning_rate = 0.1;
 
   // default = 31
-  // alias = num_leaf
+  // alias = num_leaf, max_leaves, max_leaf
   // check = >1
   // desc = max number of leaves in one tree
   int num_leaves = kDefaultNumLeaves;
@@ -167,7 +168,7 @@ public:
   // [doc-only]
   // type = enum
   // options = serial, feature, data, voting
-  // alias = tree, tree_learner_type
+  // alias = tree, tree_type, tree_learner_type
   // desc = ``serial``, single machine tree learner
   // desc = ``feature``, feature parallel tree learner, aliases: ``feature_parallel``
   // desc = ``data``, data parallel tree learner, aliases: ``data_parallel``
@@ -175,7 +176,7 @@ public:
   // desc = refer to `Parallel Learning Guide <./Parallel-Learning-Guide.rst>`__ to get more details
   std::string tree_learner = "serial";
 
-  // alias = num_thread, nthread, nthreads
+  // alias = num_thread, nthread, nthreads, n_jobs
   // desc = number of threads for LightGBM
   // desc = ``0`` means default number of threads in OpenMP
   // desc = for the best speed, set this to the number of **real CPU cores**, not the number of threads (most CPUs use `hyper-threading <https://en.wikipedia.org/wiki/Hyper-threading>`__ to generate 2 threads per CPU core)
@@ -195,9 +196,11 @@ public:
   std::string device_type = "cpu";
 
   // [doc-only]
-  // alias = random_seed
-  // desc = this seed is used to generate other seeds, e.g. ``data_random_seed``, ``feature_fraction_seed``
-  // desc = will be overridden, if you set other seeds
+  // alias = random_seed, random_state
+  // default = None
+  // desc = this seed is used to generate other seeds, e.g. ``data_random_seed``, ``feature_fraction_seed``, etc.
+  // desc = by default, this seed is unused in favor of default values of other seeds
+  // desc = this seed has lower priority in comparison with other seeds, which means that it will be overridden, if you set other seeds explicitly
   int seed = 0;
 
   #pragma endregion
@@ -264,7 +267,7 @@ public:
   // desc = L1 regularization
   double lambda_l1 = 0.0;
 
-  // alias = reg_lambda
+  // alias = reg_lambda, lambda
   // check = >=0.0
   // desc = L2 regularization
   double lambda_l2 = 0.0;
@@ -274,21 +277,22 @@ public:
   // desc = the minimal gain to perform split
   double min_gain_to_split = 0.0;
 
+  // alias = rate_drop
   // check = >=0.0
   // check = <=1.0
   // desc = used only in ``dart``
-  // desc = dropout rate
+  // desc = dropout rate: a fraction of previous trees to drop during the dropout
   double drop_rate = 0.1;
 
   // desc = used only in ``dart``
-  // desc = max number of dropped trees on one iteration
+  // desc = max number of dropped trees during one boosting iteration
   // desc = ``<=0`` means no limit
   int max_drop = 50;
 
   // check = >=0.0
   // check = <=1.0
   // desc = used only in ``dart``
-  // desc = probability of skipping drop
+  // desc = probability of skipping the dropout procedure during a boosting iteration
   double skip_drop = 0.5;
 
   // desc = used only in ``dart``
@@ -351,13 +355,27 @@ public:
   // desc = ``1`` means increasing, ``-1`` means decreasing, ``0`` means non-constraint
   // desc = you need to specify all features in order. For example, ``mc=-1,0,1`` means decreasing for 1st feature, non-constraint for 2nd feature and increasing for the 3rd feature
   std::vector<int8_t> monotone_constraints;
+
+  // type = multi-double
+  // alias = feature_contrib, fc, fp, feature_penalty
+  // default = None
+  // desc = used to control feature's split gain, will use ``gain[i] = max(0, feature_contri[i]) * gain[i]`` to replace the split gain of i-th feature
+  // desc = you need to specify all features in order
+  std::vector<double> feature_contri;
   
   // alias = fs, forced_splits_filename, forced_splits_file, forced_splits
   // desc = path to a ``.json`` file that specifies splits to force at the top of every decision tree before best-first learning commences
   // desc = ``.json`` file can be arbitrarily nested, and each split contains ``feature``, ``threshold`` fields, as well as ``left`` and ``right`` fields representing subsplits
   // desc = categorical splits are forced in a one-hot fashion, with ``left`` representing the split containing the feature value and ``right`` representing other values
+  // desc = **Note**: the forced split logic will be ignored, if the split makes gain worse
   // desc = see `this file <https://github.com/Microsoft/LightGBM/tree/master/examples/binary_classification/forced_splits.json>`__ as an example
   std::string forcedsplits_filename = "";
+
+  // check = >=0.0
+  // check = <=1.0
+  // desc = decay rate of ``refit`` task, will use ``leaf_output = refit_decay_rate * old_leaf_output + (1.0 - refit_decay_rate) * new_leaf_output`` to refit trees
+  // desc = used only in ``refit`` task in CLI version or as argument in ``refit`` function in language-specific package
+  double refit_decay_rate = 0.9;
 
   #pragma endregion
 
@@ -365,7 +383,7 @@ public:
 
   // alias = verbose
   // desc = controls the level of LightGBM's verbosity
-  // desc = ``< 0``: Fatal, ``= 0``: Error (Warn), ``> 0``: Info
+  // desc = ``< 0``: Fatal, ``= 0``: Error (Warning), ``= 1``: Info, ``> 1``: Debug
   int verbosity = 1;
 
   // check = >1
@@ -386,19 +404,24 @@ public:
   // desc = set this to larger value if data is very sparse
   int bin_construct_sample_cnt = 200000;
 
+  // alias = hist_pool_size
   // desc = max cache size in MB for historical histogram
   // desc = ``< 0`` means no limit
   double histogram_pool_size = -1.0;
 
+  // alias = data_seed
   // desc = random seed for data partition in parallel learning (excluding the ``feature_parallel`` mode)
   int data_random_seed = 1;
 
   // alias = model_output, model_out
   // desc = filename of output model in training
+  // desc = **Note**: can be used only in CLI version
   std::string output_model = "LightGBM_model.txt";
 
+  // alias = save_period
   // desc = frequency of saving model file snapshot
   // desc = set this to positive value to enable this function. For example, the model file will be snapshotted at each iteration if ``snapshot_freq=1``
+  // desc = **Note**: can be used only in CLI version
   int snapshot_freq = -1;
 
   // alias = model_input, model_in
@@ -408,20 +431,23 @@ public:
   // desc = **Note**: can be used only in CLI version
   std::string input_model = "";
 
-  // alias = predict_result, prediction_result
+  // alias = predict_result, prediction_result, predict_name, prediction_name, pred_name, name_pred
   // desc = filename of prediction result in ``prediction`` task
+  // desc = **Note**: can be used only in CLI version
   std::string output_result = "LightGBM_predict_result.txt";
 
   // alias = init_score_filename, init_score_file, init_score, input_init_score
-  // desc = path of file with training initial score
+  // desc = path of file with training initial scores
   // desc = if ``""``, will use ``train_data_file`` + ``.init`` (if exists)
+  // desc = **Note**: can be used only in CLI version
   std::string initscore_filename = "";
 
   // alias = valid_data_init_scores, valid_init_score_file, valid_init_score
   // default = ""
-  // desc = path(s) of file(s) with validation initial score(s)
+  // desc = path(s) of file(s) with validation initial scores
   // desc = if ``""``, will use ``valid_data_file`` + ``.init`` (if exists)
   // desc = separate by ``,`` for multi-validation data
+  // desc = **Note**: can be used only in CLI version
   std::vector<std::string> valid_data_initscores;
 
   // alias = is_pre_partition
@@ -447,13 +473,13 @@ public:
 
   // check = >0.0
   // check = <=1.0
-  // desc = the threshold of zero elements precentage for treating a feature as a sparse one
+  // desc = the threshold of zero elements percentage for treating a feature as a sparse one
   double sparse_threshold = 0.8;
 
   // desc = set this to ``false`` to disable the special handle of missing value
   bool use_missing = true;
 
-  // desc = set this to ``true`` to treat all zero as missing values (including the unshown values in libsvm/sparse matrics)
+  // desc = set this to ``true`` to treat all zero as missing values (including the unshown values in libsvm/sparse matrices)
   // desc = set this to ``false`` to use ``na`` for representing missing values
   bool zero_as_missing = false;
 
@@ -506,6 +532,7 @@ public:
   // desc = add a prefix ``name:`` for column name, e.g. ``ignore_column=name:c1,c2,c3`` means c1, c2 and c3 will be ignored
   // desc = **Note**: works only in case of loading data directly from file
   // desc = **Note**: index starts from ``0`` and it doesn't count the label column when passing type is ``int``
+  // desc = **Note**: despite the fact that specified columns will be completely ignored during the training, they still should have a valid format allowing LightGBM to load file successfully
   std::string ignore_column = "";
 
   // type = multi-int or string
@@ -516,7 +543,8 @@ public:
   // desc = **Note**: only supports categorical with ``int`` type
   // desc = **Note**: index starts from ``0`` and it doesn't count the label column when passing type is ``int``
   // desc = **Note**: all values should be less than ``Int32.MaxValue`` (2147483647)
-  // desc = **Note**: the negative values will be treated as **missing values**
+  // desc = **Note**: using large values could be memory consuming. Tree decision rule works best when categorical features are presented by consecutive integers starting from zero
+  // desc = **Note**: all negative values will be treated as **missing values**
   std::string categorical_feature = "";
 
   // alias = is_predict_raw_score, predict_rawscore, raw_score
@@ -532,8 +560,9 @@ public:
 
   // alias = is_predict_contrib, contrib
   // desc = used only in ``prediction`` task
-  // desc = set this to ``true`` to estimate `SHAP values <https://arxiv.org/abs/1706.06060>`__, which represent how each feature contributs to each prediction
+  // desc = set this to ``true`` to estimate `SHAP values <https://arxiv.org/abs/1706.06060>`__, which represent how each feature contributes to each prediction
   // desc = produces ``#features + 1`` values where the last value is the expected value of the model output over the training data
+  // desc = **Note**: if you want to get more explanation for your model's predictions using SHAP values like SHAP interaction values, you can install `shap package <https://github.com/slundberg/shap>`__
   bool predict_contrib = false;
 
   // desc = used only in ``prediction`` task
@@ -556,11 +585,13 @@ public:
   // desc = used only in ``convert_model`` task
   // desc = only ``cpp`` is supported yet
   // desc = if ``convert_model_language`` is set and ``task=train``, the model will be also converted
+  // desc = **Note**: can be used only in CLI version
   std::string convert_model_language = "";
 
   // alias = convert_model_file
   // desc = used only in ``convert_model`` task
   // desc = output filename of converted model
+  // desc = **Note**: can be used only in CLI version
   std::string convert_model = "gbdt_prediction.cpp";
 
   #pragma endregion
@@ -572,9 +603,9 @@ public:
   // desc = used only in ``multi-class`` classification application
   int num_class = 1;
 
-  // alias = unbalanced_sets
+  // alias = unbalance, unbalanced_sets
   // desc = used only in ``binary`` application
-  // desc = set this to ``true`` if training data are unbalance
+  // desc = set this to ``true`` if training data are unbalanced
   // desc = **Note**: this parameter cannot be used at the same time with ``scale_pos_weight``, choose only **one** of them
   bool is_unbalance = false;
 
@@ -599,7 +630,6 @@ public:
   bool reg_sqrt = false;
 
   // check = >0.0
-  // check = <1.0
   // desc = used only in ``huber`` and ``quantile`` ``regression`` applications
   // desc = parameter for `Huber loss <https://en.wikipedia.org/wiki/Huber_loss>`__ and `Quantile regression <https://en.wikipedia.org/wiki/Quantile_regression>`__
   double alpha = 0.9;
@@ -642,9 +672,9 @@ public:
   // alias = metrics, metric_types
   // default = ""
   // type = multi-enum
-  // desc = metric(s) to be evaluated on the evaluation sets **in addition** to what is provided in the training arguments
-  // descl2 = ``""`` (empty string or not specific) means that metric corresponding to specified ``objective`` will be used (this is possible only for pre-defined objective functions, otherwise no evaluation metric will be added)
-  // descl2 = ``"None"`` (string, **not** a ``None`` value) means that no metric will be registered, aliases: ``na``
+  // desc = metric(s) to be evaluated on the evaluation set(s)
+  // descl2 = ``""`` (empty string or not specified) means that metric corresponding to specified ``objective`` will be used (this is possible only for pre-defined objective functions, otherwise no evaluation metric will be added)
+  // descl2 = ``"None"`` (string, **not** a ``None`` value) means that no metric will be registered, aliases: ``na``, ``null``, ``custom``
   // descl2 = ``l1``, absolute loss, aliases: ``mean_absolute_error``, ``mae``, ``regression_l1``
   // descl2 = ``l2``, square loss, aliases: ``mean_squared_error``, ``mse``, ``regression_l2``, ``regression``
   // descl2 = ``l2_root``, root square loss, aliases: ``root_mean_squared_error``, ``rmse``
@@ -656,7 +686,7 @@ public:
   // descl2 = ``gamma``, negative log-likelihood for **Gamma** regression
   // descl2 = ``gamma_deviance``, residual deviance for **Gamma** regression
   // descl2 = ``tweedie``, negative log-likelihood for **Tweedie** regression
-  // descl2 = ``ndcg``, `NDCG <https://en.wikipedia.org/wiki/Discounted_cumulative_gain#Normalized_DCG>`__
+  // descl2 = ``ndcg``, `NDCG <https://en.wikipedia.org/wiki/Discounted_cumulative_gain#Normalized_DCG>`__, aliases: ``lambdarank``
   // descl2 = ``map``, `MAP <https://makarandtapaswi.wordpress.com/2012/07/02/intuition-behind-average-precision-and-map/>`__, aliases: ``mean_average_precision``
   // descl2 = ``auc``, `AUC <https://en.wikipedia.org/wiki/Receiver_operating_characteristic#Area_under_the_curve>`__
   // descl2 = ``binary_logloss``, `log loss <https://en.wikipedia.org/wiki/Cross_entropy>`__, aliases: ``binary``
@@ -676,13 +706,14 @@ public:
 
   // alias = training_metric, is_training_metric, train_metric
   // desc = set this to ``true`` to output metric result over training dataset
+  // desc = **Note**: can be used only in CLI version
   bool is_provide_training_metric = false;
 
   // type = multi-int
   // default = 1,2,3,4,5
-  // alias = ndcg_eval_at, ndcg_at
+  // alias = ndcg_eval_at, ndcg_at, map_eval_at, map_at
   // desc = used only with ``ndcg`` and ``map`` metrics
-  // desc = `NDCG <https://en.wikipedia.org/wiki/Discounted_cumulative_gain#Normalized_DCG>`__ evaluation positions, separated by ``,``
+  // desc = `NDCG <https://en.wikipedia.org/wiki/Discounted_cumulative_gain#Normalized_DCG>`__ and `MAP <https://makarandtapaswi.wordpress.com/2012/07/02/intuition-behind-average-precision-and-map/>`__ evaluation positions, separated by ``,``
   std::vector<int> eval_at;
 
   #pragma endregion
@@ -720,10 +751,12 @@ public:
 
   // desc = OpenCL platform ID. Usually each GPU vendor exposes one OpenCL platform
   // desc = ``-1`` means the system-wide default platform
+  // desc = **Note**: refer to `GPU Targets <./GPU-Targets.rst#query-opencl-devices-in-your-system>`__ for more details
   int gpu_platform_id = -1;
 
   // desc = OpenCL device ID in the specified platform. Each GPU in the selected platform has a unique device ID
   // desc = ``-1`` means the default device in the selected platform
+  // desc = **Note**: refer to `GPU Targets <./GPU-Targets.rst#query-opencl-devices-in-your-system>`__ for more details
   int gpu_device_id = -1;
 
   // desc = set this to ``true`` to use double precision math on GPU (by default single precision is used)

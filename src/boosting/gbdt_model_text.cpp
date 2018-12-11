@@ -12,7 +12,7 @@ namespace LightGBM {
 
 const std::string kModelVersion = "v2";
 
-std::string GBDT::DumpModel(int num_iteration) const {
+std::string GBDT::DumpModel(int start_iteration, int num_iteration) const {
   std::stringstream str_buf;
 
   str_buf << "{";
@@ -22,6 +22,10 @@ std::string GBDT::DumpModel(int num_iteration) const {
   str_buf << "\"num_tree_per_iteration\":" << num_tree_per_iteration_ << "," << '\n';
   str_buf << "\"label_index\":" << label_idx_ << "," << '\n';
   str_buf << "\"max_feature_idx\":" << max_feature_idx_ << "," << '\n';
+  str_buf << "\"average_output\":" << (average_output_ ? "true" : "false") << ",\n";
+  if (objective_function_ != nullptr) {
+    str_buf << "\"objective\":\"" << objective_function_->ToString() << "\",\n";
+  }
 
   str_buf << "\"feature_names\":[\""
     << Common::Join(feature_names_, "\",\"") << "\"],"
@@ -29,11 +33,16 @@ std::string GBDT::DumpModel(int num_iteration) const {
 
   str_buf << "\"tree_info\":[";
   int num_used_model = static_cast<int>(models_.size());
+  int total_iteration = num_used_model / num_tree_per_iteration_;
+  start_iteration = std::max(start_iteration, 0);
+  start_iteration = std::min(start_iteration, total_iteration);
   if (num_iteration > 0) {
-    num_used_model = std::min(num_iteration * num_tree_per_iteration_, num_used_model);
+    int end_iteration = start_iteration + num_iteration;
+    num_used_model = std::min(end_iteration * num_tree_per_iteration_ , num_used_model);
   }
-  for (int i = 0; i < num_used_model; ++i) {
-    if (i > 0) {
+  int start_model = start_iteration * num_tree_per_iteration_;
+  for (int i = start_model; i < num_used_model; ++i) {
+    if (i > start_model) {
       str_buf << ",";
     }
     str_buf << "{";
@@ -232,7 +241,7 @@ bool GBDT::SaveModelToIfElse(int num_iteration, const char* filename) const {
   return (bool)output_file;
 }
 
-std::string GBDT::SaveModelToString(int num_iteration) const {
+std::string GBDT::SaveModelToString(int start_iteration, int num_iteration) const {
   std::stringstream ss;
 
   // output model type
@@ -259,27 +268,35 @@ std::string GBDT::SaveModelToString(int num_iteration) const {
   ss << "feature_infos=" << Common::Join(feature_infos_, " ") << '\n';
 
   int num_used_model = static_cast<int>(models_.size());
+  int total_iteration = num_used_model / num_tree_per_iteration_;
+  start_iteration = std::max(start_iteration, 0);
+  start_iteration = std::min(start_iteration, total_iteration);
   if (num_iteration > 0) {
-    num_used_model = std::min(num_iteration * num_tree_per_iteration_, num_used_model);
+    int end_iteration = start_iteration + num_iteration;
+    num_used_model = std::min(end_iteration * num_tree_per_iteration_, num_used_model);
   }
 
-  std::vector<std::string> tree_strs(num_used_model);
-  std::vector<size_t> tree_sizes(num_used_model);
+  int start_model = start_iteration * num_tree_per_iteration_;
+
+  std::vector<std::string> tree_strs(num_used_model - start_model);
+  std::vector<size_t> tree_sizes(num_used_model - start_model);
   // output tree models
   #pragma omp parallel for schedule(static)
-  for (int i = 0; i < num_used_model; ++i) {
-    tree_strs[i] = "Tree=" + std::to_string(i) + '\n';
-    tree_strs[i] += models_[i]->ToString() + '\n';
-    tree_sizes[i] = tree_strs[i].size();
+  for (int i = start_model; i < num_used_model; ++i) {
+    const int idx = i - start_model;
+    tree_strs[idx] = "Tree=" + std::to_string(idx) + '\n';
+    tree_strs[idx] += models_[i]->ToString() + '\n';
+    tree_sizes[idx] = tree_strs[idx].size();
   }
 
   ss << "tree_sizes=" << Common::Join(tree_sizes, " ") << '\n';
   ss << '\n';
 
-  for (int i = 0; i < num_used_model; ++i) {
+  for (int i = 0; i < num_used_model - start_model; ++i) {
     ss << tree_strs[i];
     tree_strs[i].clear();
   }
+  ss << "end of trees" << "\n";
 
   std::vector<double> feature_importances = FeatureImportance(num_iteration, 0);
   // store the importance first
@@ -291,9 +308,9 @@ std::string GBDT::SaveModelToString(int num_iteration) const {
     }
   }
   // sort the importance
-  std::sort(pairs.begin(), pairs.end(),
-            [](const std::pair<size_t, std::string>& lhs,
-               const std::pair<size_t, std::string>& rhs) {
+  std::stable_sort(pairs.begin(), pairs.end(),
+                   [](const std::pair<size_t, std::string>& lhs,
+                      const std::pair<size_t, std::string>& rhs) {
     return lhs.first > rhs.first;
   });
   ss << '\n' << "feature importances:" << '\n';
@@ -301,17 +318,22 @@ std::string GBDT::SaveModelToString(int num_iteration) const {
     ss << pairs[i].second << "=" << std::to_string(pairs[i].first) << '\n';
   }
   if (config_ != nullptr) {
-    ss << "parameters:" << '\n';
+    ss << "\nparameters:" << '\n';
     ss << config_->ToString() << "\n";
+    ss << "end of parameters" << '\n';
+  } else if (!loaded_parameter_.empty()) {
+    ss << "\nparameters:" << '\n';
+    ss << loaded_parameter_ << "\n";
+    ss << "end of parameters" << '\n';
   }
   return ss.str();
 }
 
-bool GBDT::SaveModelToFile(int num_iteration, const char* filename) const {
+bool GBDT::SaveModelToFile(int start_iteration, int num_iteration, const char* filename) const {
   /*! \brief File to write models */
   std::ofstream output_file;
   output_file.open(filename, std::ios::out | std::ios::binary);
-  std::string str_to_write = SaveModelToString(num_iteration);
+  std::string str_to_write = SaveModelToString(start_iteration, num_iteration);
   output_file.write(str_to_write.c_str(), str_to_write.size());
   output_file.close();
 
@@ -465,7 +487,26 @@ bool GBDT::LoadModelFromString(const char* buffer, size_t len) {
   num_iteration_for_pred_ = static_cast<int>(models_.size()) / num_tree_per_iteration_;
   num_init_iteration_ = num_iteration_for_pred_;
   iter_ = 0;
-
+  bool is_inparameter = false;
+  std::stringstream ss;
+  while (p < end) {
+    auto line_len = Common::GetLine(p);
+    std::string cur_line(p, line_len);
+    if (line_len > 0) {
+      if (cur_line == std::string("parameters:")) {
+        is_inparameter = true;
+      } else if (cur_line == std::string("end of parameters")) {
+        break;
+      } else if (is_inparameter) {
+        ss << cur_line << "\n";
+      }
+    }
+    p += line_len;
+    p = Common::SkipNewLine(p);
+  }
+  if (!ss.str().empty()) {
+    loaded_parameter_ = ss.str();
+  }
   return true;
 }
 

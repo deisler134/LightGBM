@@ -3,7 +3,6 @@
 #include <LightGBM/utils/common.h>
 
 #include <cstring>
-
 #include <tuple>
 #include <vector>
 
@@ -70,6 +69,7 @@ void VotingParallelTreeLearner<TREELEARNER_T>::Init(const Dataset* train_data, b
     feature_metas_[i].default_bin = train_data->FeatureBinMapper(i)->GetDefaultBin();
     feature_metas_[i].missing_type = train_data->FeatureBinMapper(i)->missing_type();
     feature_metas_[i].monotone_type = train_data->FeatureMonotone(i);
+    feature_metas_[i].penalty = train_data->FeaturePenalte(i);
     if (train_data->FeatureBinMapper(i)->GetDefaultBin() == 0) {
       feature_metas_[i].bias = 1;
     } else {

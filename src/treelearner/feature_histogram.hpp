@@ -19,6 +19,7 @@ public:
   int8_t bias = 0;
   uint32_t default_bin;
   int8_t monotone_type;
+  double penalty;
   /*! \brief pointer of tree config */
   const Config* config;
   BinType bin_type;
@@ -77,6 +78,7 @@ public:
     output->default_left = true;
     output->gain = kMinScore;
     find_best_threshold_fun_(sum_gradient, sum_hessian + 2 * kEpsilon, num_data, min_constraint, max_constraint, output);
+    output->gain *= meta_->penalty;
   }
 
   void FindBestThresholdNumerical(double sum_gradient, double sum_hessian, data_size_t num_data, double min_constraint, double max_constraint,
@@ -297,13 +299,11 @@ public:
     data_size_t right_count = 0;
 
     // set values
-    bool use_na_as_missing;
-    bool skip_default_bin;
+    bool use_na_as_missing = false;
+    bool skip_default_bin = false;
     if (meta_->missing_type == MissingType::Zero) {
       skip_default_bin = true;
-      use_na_as_missing = false;
-    } else {
-      skip_default_bin = false;
+    } else if (meta_->missing_type == MissingType::NaN) {
       use_na_as_missing = true;
     }
 
@@ -334,7 +334,7 @@ public:
     // gain with split is worse than without split
     if (std::isnan(current_gain) || current_gain <= min_gain_shift) {
       output->gain = kMinScore;
-      Log::Warning("Gain with forced split worse than without split");
+      Log::Warning("'Forced Split' will be ignored since the gain getting worse. ");
       return;
     };
 
@@ -391,7 +391,7 @@ public:
                            meta_->config->max_delta_step);
     if (std::isnan(current_gain) || current_gain <= min_gain_shift) {
       output->gain = kMinScore;
-      Log::Warning("Gain with forced split worse than without split");
+      Log::Warning("'Forced Split' will be ignored since the gain getting worse. ");
       return;
     }
 
@@ -707,6 +707,7 @@ public:
         feature_metas_[i].default_bin = train_data->FeatureBinMapper(i)->GetDefaultBin();
         feature_metas_[i].missing_type = train_data->FeatureBinMapper(i)->missing_type();
         feature_metas_[i].monotone_type = train_data->FeatureMonotone(i);
+        feature_metas_[i].penalty = train_data->FeaturePenalte(i);
         if (train_data->FeatureBinMapper(i)->GetDefaultBin() == 0) {
           feature_metas_[i].bias = 1;
         } else {

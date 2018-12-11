@@ -15,8 +15,9 @@
 
 # If extensions (or modules to document with autodoc) are in another directory,
 # add these directories to sys.path here. If the directory is relative to the
-# documentation root, use os.path.abspath to make it absolute, like shown here.
-#
+# documentation root, use os.path.abspath to make it absolute.
+"""Sphinx configuration file."""
+import datetime
 import os
 import sys
 import sphinx
@@ -33,11 +34,9 @@ except ImportError:
     from mock import Mock  # Python 2.x
 
 MOCK_MODULES = ['numpy', 'scipy', 'scipy.sparse',
-                'sklearn', 'matplotlib', 'pandas', 'graphviz',
-]
+                'sklearn', 'matplotlib', 'pandas', 'graphviz']
 for mod_name in MOCK_MODULES:
     sys.modules[mod_name] = Mock()
-
 
 # -- General configuration ------------------------------------------------
 
@@ -71,7 +70,7 @@ master_doc = 'index'
 
 # General information about the project.
 project = 'LightGBM'
-copyright = '2017, Microsoft Corporation'
+copyright = '%s, Microsoft Corporation' % str(datetime.datetime.now().year)
 author = 'Microsoft Corporation'
 
 # The version info for the project you're documenting, acts as replacement for
@@ -96,7 +95,7 @@ language = None
 exclude_patterns = ['_build', 'Thumbs.db', '.DS_Store']
 
 # The name of the Pygments (syntax highlighting) style to use.
-pygments_style = 'sphinx'
+pygments_style = 'default'
 
 # If true, `todo` and `todoList` produce output, else they produce nothing.
 todo_include_todos = False
@@ -108,13 +107,11 @@ autoclass_content = 'both'
 
 # The theme to use for HTML and HTML Help pages.  See the documentation for
 # a list of builtin themes.
-#
 html_theme = 'sphinx_rtd_theme'
 
 # Theme options are theme-specific and customize the look and feel of a theme
 # further.  For a list of options available for each theme, see the
 # documentation.
-#
 html_theme_options = {
     'includehidden': False,
 }
@@ -124,7 +121,6 @@ html_theme_options = {
 # so a file named "default.css" will overwrite the builtin "default.css".
 html_static_path = ['_static']
 
-
 # -- Options for HTMLHelp output ------------------------------------------
 
 # Output file base name for HTML help builder.
@@ -132,4 +128,11 @@ htmlhelp_basename = 'LightGBMdoc'
 
 
 def setup(app):
-    app.add_javascript("js/rst_links_fix.js")
+    """Add new elements at Sphinx initialization time.
+
+    Parameters
+    ----------
+    app : object
+        The application object representing the Sphinx process.
+    """
+    app.add_javascript("js/script.js")
